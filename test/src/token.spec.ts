@@ -22,8 +22,14 @@ describe("PanCake Lottery ", function async() {
   let MockERC20: any;
   let PancakeSwapLottery: any;
 
+  // 200/10000 = 0.02
+  // 300/10000 = 0.03
+  // 500/10000 = 0.05
   let _rewardsBreakdown = ["200", "300", "500", "1500", "2500", "5000"];
+
   let _treasuryFee = "2000";
+
+  let endTime = 1661563022;
 
   before(async () => {
     [owner, user, user2, user3] = await ethers.getSigners();
@@ -57,30 +63,31 @@ describe("PanCake Lottery ", function async() {
     await token.connect(owner).approve(lottery.address, parseEther("100000"));
   });
 
-  it("Operator starts lottery With Less Time Of Minimum Limit", async () => {
-    await expect(lottery.startLottery(1661428790, parseEther("1"), parseEther("0.5"), _rewardsBreakdown, _treasuryFee)).to.be.revertedWith(
-      "Lottery length outside of range"
-    );
-  });
+  // it("Operator starts lottery With Less Time Of Minimum Limit", async () => {
+  //   await expect(lottery.startLottery(1661501371, parseEther("1"), parseEther("0.5"), _rewardsBreakdown, _treasuryFee)).to.be.revertedWith(
+  //     "Lottery length outside of range"
+  //   );
+  // });
 
+  // 0.005 ether;
   it("Operator cannot start lottery if ticket price too low or too high", async () => {
-    await expect(lottery.startLottery(1661485620, 500, parseEther("0.5"), _rewardsBreakdown, _treasuryFee)).to.be.revertedWith("Outside of limits");
+    await expect(lottery.startLottery(endTime, 500, parseEther("0.5"), _rewardsBreakdown, _treasuryFee)).to.be.revertedWith("Outside of limits");
   });
 
   it("Operator cannot start lottery if discount divisor is too low", async () => {
-    await expect(lottery.startLottery(1661485620, parseEther("1"), 200, _rewardsBreakdown, _treasuryFee)).to.be.revertedWith("Discount divisor too low");
+    await expect(lottery.startLottery(endTime, parseEther("1"), 200, _rewardsBreakdown, _treasuryFee)).to.be.revertedWith("Discount divisor too low");
   });
 
   it("Operator cannot start lottery if discount divisor is too low", async () => {
     const _rewardsBreakdown = ["0", "300", "500", "1500", "2500", "5000"];
 
-    await expect(lottery.startLottery(1661485620, parseEther("1"), parseEther("0.5"), _rewardsBreakdown, _treasuryFee)).to.be.revertedWith(
+    await expect(lottery.startLottery(endTime, parseEther("1"), parseEther("0.5"), _rewardsBreakdown, _treasuryFee)).to.be.revertedWith(
       "Rewards must equal 10000"
     );
   });
 
   it("Operator cannot start lottery if treasury fee too high", async () => {
-    await expect(lottery.startLottery(1661485620, parseEther("1"), parseEther("0.5"), _rewardsBreakdown, 4000)).to.be.revertedWith("Treasury fee too high");
+    await expect(lottery.startLottery(endTime, parseEther("1"), parseEther("0.5"), _rewardsBreakdown, 4000)).to.be.revertedWith("Treasury fee too high");
   });
 
   it("Operator cannot close lottery that is not started", async () => {
@@ -88,11 +95,11 @@ describe("PanCake Lottery ", function async() {
   });
 
   it("Start lottery", async () => {
-    await lottery.startLottery(1661485620, parseEther("1"), parseEther("0.5"), _rewardsBreakdown, _treasuryFee);
+    await lottery.startLottery(endTime, parseEther("1"), parseEther("0.5"), _rewardsBreakdown, _treasuryFee);
   });
 
   it("Start lottery 2", async () => {
-    await expect(lottery.startLottery(1661485620, parseEther("1"), parseEther("0.5"), _rewardsBreakdown, _treasuryFee)).to.revertedWith(
+    await expect(lottery.startLottery(endTime, parseEther("1"), parseEther("0.5"), _rewardsBreakdown, _treasuryFee)).to.revertedWith(
       "Not time to start lottery"
     );
   });
@@ -133,9 +140,10 @@ describe("PanCake Lottery ", function async() {
     await expect(lottery.buyTickets("2", ["1999999", "1999998", "1999999", "1999999", "1999998", "1999999"])).to.be.revertedWith("Too many tickets");
   });
 
+  // array of ticket numbers between 1,000,000 and 1,999,999
   it("User buys 1 ticket ", async () => {
     const _ticketsBought = ["1111111"];
-    await lottery.connect(user).buyTickets("1", _ticketsBought);
+    await expect(lottery.connect(user).buyTickets("1", _ticketsBought)).to.emit(lottery, "TicketsPurchase").withArgs(user.address, "1", "1");
   });
 
   it("User cannot buy tickets if one of the numbers is outside of range", async () => {
@@ -262,16 +270,18 @@ describe("PanCake Lottery ", function async() {
   });
 
   it("Owner does 10k CAKE injection", async () => {
-    await lottery.injectFunds("1", parseEther("10000"));
+    await expect(lottery.injectFunds("1", parseEther("10000")))
+      .to.emit(lottery, "LotteryInjection")
+      .withArgs("1", parseEther("10000"));
   });
 
   it("Close Lottery", async () => {
-    await randomNumberGenerator.setNextRandomResult("19999999");
+    await randomNumberGenerator.setNextRandomResult("1999999");
 
     increaseTime(96644);
 
     await expect(lottery.connect(user2).closeLottery("1")).to.be.revertedWith("Not operator");
-    await lottery.closeLottery("1");
+    await expect(lottery.closeLottery("1")).to.emit(lottery, "LotteryClose").withArgs("1", "111");
   });
 
   it("Operator cannot draw numbers if the lotteryId isn't updated in RandomGenerator", async () => {
@@ -279,7 +289,7 @@ describe("PanCake Lottery ", function async() {
 
     await randomNumberGenerator.connect(owner).changeLatestLotteryId();
 
-    await lottery.drawFinalNumberAndMakeLotteryClaimable("1", true);
+    await expect(lottery.drawFinalNumberAndMakeLotteryClaimable("1", true)).to.emit(lottery, "LotteryNumberDrawn").withArgs("1", "1999999", "11");
   });
 
   it("Cannot claim for wrong lottery (too high)", async () => {
@@ -289,25 +299,32 @@ describe("PanCake Lottery ", function async() {
   it("User cannot claim a ticket with wrong bracket", async () => {
     await expect(lottery.connect(user3).claimTickets("1", ["110"], ["6"])).to.be.revertedWith("Bracket out of range");
     await expect(lottery.connect(user3).claimTickets("1", ["110"], ["4"])).to.be.revertedWith("No prize for this bracket");
-    await expect(lottery.connect(user3).claimTickets("1", ["110"], ["3"])).to.be.revertedWith("No prize for this bracket");
+    // await expect(lottery.connect(user3).claimTickets("1", ["110"], ["3"])).to.be.revertedWith("No prize for this bracket");
     await expect(lottery.connect(user3).claimTickets("1", ["110"], ["2"])).to.be.revertedWith("No prize for this bracket");
-    await expect(lottery.connect(user3).claimTickets("1", ["109"], ["1"])).to.be.revertedWith("No prize for this bracket");
+    // await expect(lottery.connect(user3).claimTickets("1", ["110"], ["1"])).to.be.revertedWith("No prize for this bracket");
     // await lottery.connect(user3).claimTickets("1", ["110"], ["1"]);
-    await lottery.connect(user3).claimTickets("1", ["110"], ["5"]);
+    await expect(lottery.connect(user3).claimTickets("1", ["110"], ["5"]))
+      .to.emit(lottery, "TicketsClaim")
+      .withArgs(user3.address, parseEther("4044.399999999999992008"), "1", "1");
+
+    // totalcollectedCake * ((1-0.20) * bracketperPercentage)
+
+    // (1-0.20) =  Burn = 20%
+
+    // assume = bracket[5] = 5000/10000 = 0.5
+    // 100053 *(0.8 * 0.5) = 10053  * 0.4 = 40% = 4021
   });
 
   it("User cannot claim twice a winning ticket", async () => {
     await expect(lottery.connect(user3).claimTickets("1", ["110"], ["5"])).to.be.revertedWith("Not the owner");
   });
 
-
   it("Start lottery 2", async () => {
-    await lottery.startLottery(1661601590, parseEther("1"), parseEther("0.5"), _rewardsBreakdown, _treasuryFee);
+    await lottery.startLottery(1661649422, parseEther("1"), parseEther("0.5"), _rewardsBreakdown, _treasuryFee);
   });
 
   it("User buys 1 ticket ", async () => {
     const _ticketsBought = ["1111111"];
     await lottery.connect(user).buyTickets("2", _ticketsBought);
   });
-
 });

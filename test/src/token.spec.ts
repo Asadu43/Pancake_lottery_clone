@@ -308,9 +308,7 @@ describe("PanCake Lottery ", function async() {
       .withArgs(user3.address, parseEther("4044.399999999999992008"), "1", "1");
 
     // totalcollectedCake * ((1-0.20) * bracketperPercentage)
-
     // (1-0.20) =  Burn = 20%
-
     // assume = bracket[5] = 5000/10000 = 0.5
     // 100053 *(0.8 * 0.5) = 10053  * 0.4 = 40% = 4021
   });
